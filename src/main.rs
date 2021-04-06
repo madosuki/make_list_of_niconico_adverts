@@ -1,8 +1,7 @@
 use std::collections::HashMap;
-use serde::{Deserialize};
+use serde::Deserialize;
 use regex::Regex;
-use chrono::{DateTime, NaiveDateTime};
-
+use chrono::DateTime;
 
 #[derive(Deserialize, Debug)]
 struct NicoNicoAdvert {
@@ -88,7 +87,13 @@ struct Histories {
     message: Option<String>
 }
 
-async fn check_before_2017_12_12_or_after(video_id: &str) -> Result<bool, Box<dyn std::error::Error>> {
+enum _IsRenewal {
+    _Before,
+    _After
+}
+
+
+async fn check_before_2017_12_12_or_after(video_id: &str) -> Result<_IsRenewal, Box<dyn std::error::Error>> {
     let detail_query = format!("https://ext.nicovideo.jp/api/getthumbinfo/{}", video_id);
     let response = reqwest::get(detail_query).await?.text().await?;
     
@@ -98,35 +103,17 @@ async fn check_before_2017_12_12_or_after(video_id: &str) -> Result<bool, Box<dy
     println!("{}", first_retrieve);
     let _target = DateTime::parse_from_rfc3339(&first_retrieve).unwrap();
     let _boundary_date = DateTime::parse_from_rfc3339(&"2017-12-13T00:00:00+09:00").unwrap();
-
-    Ok(if _target < _boundary_date { false } else { true })
+    
+    Ok(if _target < _boundary_date { _IsRenewal::_Before } else { _IsRenewal::_After })
 }
 
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let _url = "https://www.nicovideo.jp/watch/sm38531871";
-
-    let video_id: String;
-    let re = Regex::new(r"https://www.nicovideo.jp/watch/(sm[0-9]+)$").unwrap();
-    let capture = re.captures(_url);
-    match capture {
-        Some(x) => {
-            video_id = x[1].to_string();
-        }
-        _ => {
-            println!("invalid url");
-            panic!("")
-        }
-    }
-
-    let check = check_before_2017_12_12_or_after(&video_id).await?;
-        
-
+async fn create_list_from_json(video_id: &str) -> Result<(), Box<dyn std::error::Error>> {
     let mut result: HashMap<String, i64> = HashMap::new();
     
     let mut i = 0;
     let page = 128;
+    
     loop {
         let query = format!("https://api.nicoad.nicovideo.jp/v1/contents/video/{}/histories?offset={}&limit={}", video_id, i, page);
 
@@ -152,6 +139,41 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     for i in result {
         println!("key: {}, count: {}", i.0, i.1);
     }
+
+    Ok(())
+}
+
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // let _url = "https://www.nicovideo.jp/watch/sm38531871";
+    // let _url = "https://www.nicovideo.jp/watch/sm25597642";
+    let _url = "https://www.nicovideo.jp/watch/sm31881208";
+    
+
+    let video_id: String;
+    let re = Regex::new(r"https://www.nicovideo.jp/watch/(sm[0-9]+)$").unwrap();
+    let capture = re.captures(_url);
+    match capture {
+        Some(x) => {
+            video_id = x[1].to_string();
+        }
+        _ => {
+            println!("invalid url");
+            panic!("")
+        }
+    }
+
+    match check_before_2017_12_12_or_after(&video_id).await? {
+        _IsRenewal::_Before => {
+            println!("before");
+            create_list_from_json(&video_id).await?;
+        },
+        _IsRenewal::_After => {
+            create_list_from_json(&video_id).await?;
+        }
+    }
+
     
     
     Ok(())
