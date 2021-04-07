@@ -1,7 +1,29 @@
 use std::collections::HashMap;
+
 use serde::Deserialize;
 use regex::Regex;
 use chrono::DateTime;
+use clap::{Arg, App};
+
+// struct OptionError {
+//     e: String
+// }
+
+// impl fmt::Display for OptionError {
+//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+//         write!(f, "Error: {}", self.0)
+//     }
+// }
+
+// impl std::error::Error for OptionError {
+//     fn description(&self) -> &str { &self.e }
+// }
+
+
+enum Mode {
+    Normal,
+    WithCount
+}
 
 #[derive(Deserialize, Debug)]
 struct Thumb {
@@ -101,7 +123,7 @@ async fn check_before_2017_12_12_or_after(video_id: &str) -> Result<_IsRenewal, 
     let xml: VideoInfo = serde_xml_rs::from_str(&response).unwrap();
 
     let first_retrieve = xml.thumb.first_retrieve;
-    // println!("{}", first_retrieve);
+
     let _target = DateTime::parse_from_rfc3339(&first_retrieve).unwrap();
     let _boundary_date = DateTime::parse_from_rfc3339(&"2017-12-13T00:00:00+09:00").unwrap();
     
@@ -220,21 +242,61 @@ async fn before_process(video_id: &str) -> Result<Option<DownloadData>, Box<dyn 
             Ok(None)
         },
     }
-
-
 }
 
-
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // let _url = "https://www.nicovideo.jp/watch/sm38531871";
-    let _url = "https://www.nicovideo.jp/watch/sm25597642";
-    // let _url = "https://www.nicovideo.jp/watch/sm31881208";
+fn shape_text(data: DownloadData, mode: Mode, width: i32) -> String {
     
+    match mode {
+        Mode::WithCount => {
+            let mut s: String = "".to_owned();
+            let mut count = 0;
+            
+            for i in data.with_count {
+                if count > 0 {
+                    s = format!("{} {}x{}", s, i.0, i.1);
+                } else {
+                    s = format!("{}{}x{}", s, i.0, i.1);
+                }
+
+                count += 1;
+
+                if count == width {
+                    s = s + "\n";
+                    count = 0;
+                }
+            }
+
+            s
+        },
+        Mode::Normal => {
+
+            let mut s: String = "".to_owned();
+            let mut count = 0;
+            for i in data.original {
+                if count > 0 {
+                    s = format!("{} {}", s, i);
+                } else {
+                    s = format!("{}{}", s, i);
+                }
+
+                count += 1;
+
+                if count == width {
+                    s = s + "\n";
+                    count = 0;
+                }
+            }
+            
+            s
+        }
+    }
+}
+
+async fn get_list(url: &str, width: i32) -> Result<(), Box<dyn std::error::Error>> {
 
     let video_id: String;
     let re = Regex::new(r"https://www.nicovideo.jp/watch/(sm[0-9]+)$").unwrap();
-    let capture = re.captures(_url);
+    let capture = re.captures(url);
     match capture {
         Some(x) => {
             video_id = x[1].to_string();
@@ -253,18 +315,56 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let c = before_process(&video_id).await?;
             if c.is_some() {
                 let result = c.unwrap();
-                for i in result.with_count {
-                    println!("{} x {}", i.0, i.1);
-                    
-                }
+                let final_text = shape_text(result, Mode::WithCount, width);
+                println!("{}", final_text);
             }
         },
         _IsRenewal::_After => {
-            create_list_from_json(&video_id).await?;
+            let a = create_list_from_json(&video_id).await?;
+            let final_text = shape_text(a, Mode::Normal, width);
+            println!("{}", final_text);
         }
     }
 
+    Ok(())
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // let _url = "https://www.nicovideo.jp/watch/sm38531871";
+    // let _url = "https://www.nicovideo.jp/watch/sm25597642";
+    // let _url = "https://www.nicovideo.jp/watch/sm31881208";
+
     
+    let matches = App::new("make list of niconico_adverts")
+        .arg(Arg::with_name("url")
+             .short("u")
+             .long("url")
+             .takes_value(true)
+             .help("video url.")
+        )
+        .arg(Arg::with_name("width")
+             .short("w")
+             .long("width")
+             .takes_value(true)
+             .help("number of name in per line. this param is optional. default value of 3."))
+        .get_matches();
+
+    let _url = matches.value_of("url").unwrap_or("");
+    let tmp_width = matches.value_of("width").unwrap_or("");
+
+    if _url.len() == 0 {
+        panic!("requre url")
+    }
+
+    let width: i32;
+    if tmp_width.len() > 0 {
+        width = tmp_width.parse().unwrap_or(3);
+    } else {
+        width = 3;
+    }
+
+    get_list(_url, width).await?;
     
     Ok(())
 }
