@@ -4,23 +4,6 @@ use regex::Regex;
 use chrono::DateTime;
 
 #[derive(Deserialize, Debug)]
-struct NicoNicoAdvert {
-    meta: Status,
-    data: Data
-}
-
-#[derive(Deserialize, Debug)]
-struct Status {
-    status: i32
-}
-
-
-#[derive(Deserialize, Debug)]
-struct Tag {
-    tag: String
-}
-
-#[derive(Deserialize, Debug)]
 struct Thumb {
     video_id: String,
     title: String,
@@ -51,6 +34,12 @@ struct VideoInfo {
     thumb: Thumb
 }
 
+
+
+#[derive(Deserialize, Debug)]
+struct Status {
+    status: i32
+}
 
 #[derive(Deserialize, Debug)]
 struct Data {
@@ -87,6 +76,18 @@ struct Histories {
     message: Option<String>
 }
 
+#[derive(Deserialize, Debug)]
+struct NicoNicoAdvert {
+    meta: Status,
+    data: Data
+}
+
+struct DownloadData {
+    original: Vec<String>,
+    with_count: HashMap<String, i64>
+}
+
+
 enum _IsRenewal {
     _Before,
     _After
@@ -100,16 +101,41 @@ async fn check_before_2017_12_12_or_after(video_id: &str) -> Result<_IsRenewal, 
     let xml: VideoInfo = serde_xml_rs::from_str(&response).unwrap();
 
     let first_retrieve = xml.thumb.first_retrieve;
-    println!("{}", first_retrieve);
+    // println!("{}", first_retrieve);
     let _target = DateTime::parse_from_rfc3339(&first_retrieve).unwrap();
     let _boundary_date = DateTime::parse_from_rfc3339(&"2017-12-13T00:00:00+09:00").unwrap();
     
     Ok(if _target < _boundary_date { _IsRenewal::_Before } else { _IsRenewal::_After })
 }
 
+async fn create_list_from_csv(video_id: &str) -> Result<DownloadData, Box<dyn std::error::Error>> {
+    let mut result: DownloadData = DownloadData {original: vec!(), with_count: HashMap::new()};
+    
+    let query = format!("https://secure-dcdn.cdn.nimg.jp/nicoad/res/old-video-comments/{}.csv", video_id);
+    let response = reqwest::get(query).await?.text().await?;
+    let splited_from_newline = response.split("\n");
 
-async fn create_list_from_json(video_id: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let mut result: HashMap<String, i64> = HashMap::new();
+    let set_data = |x: &str| {
+        let splited_from_camma: Vec<&str> = x.split(",").collect();
+        let key: String = splited_from_camma[0].to_owned();
+
+        if key.len() > 3 {
+            let len = key.len();
+            let final_key = &key.clone()[1..len - 1].to_string();
+            
+            *result.with_count.entry(final_key.clone()).or_insert(0) += 1;
+            result.original.push(final_key.to_string());
+            
+        }
+    };
+
+    splited_from_newline.for_each(set_data);
+
+    Ok(result)
+}
+
+async fn create_list_from_json(video_id: &str) -> Result<DownloadData, Box<dyn std::error::Error>> {
+    let mut result: DownloadData = DownloadData {original: vec!(), with_count: HashMap::new()};
     
     let mut i = 0;
     let page = 128;
@@ -124,8 +150,11 @@ async fn create_list_from_json(video_id: &str) -> Result<(), Box<dyn std::error:
 
         
         for i in data.histories {
+
+            let key = i.advertiser_name;
             
-            *result.entry(i.advertiser_name).or_insert(0) += 1;
+            *result.with_count.entry(key.clone()).or_insert(0) += 1;
+            result.original.push(key);
             
         }
 
@@ -136,19 +165,71 @@ async fn create_list_from_json(video_id: &str) -> Result<(), Box<dyn std::error:
         i = i + len;
     }
 
-    for i in result {
-        println!("key: {}, count: {}", i.0, i.1);
+    Ok(result)
+}
+
+async fn before_process(video_id: &str) -> Result<Option<DownloadData>, Box<dyn std::error::Error>> {
+
+    let a = create_list_from_json(&video_id).await;
+    let mut is_got_json = false;
+    match a {
+        Ok(_) => {
+            is_got_json = true;
+        },
+        _ => {
+            
+        }
     }
 
-    Ok(())
+    let b = create_list_from_csv(&video_id).await;
+    let mut is_got_csv = false;
+    match b {
+        Ok(_) => {
+            is_got_csv = true;
+        },
+        _ => {
+            
+        }
+    }
+
+    match (is_got_csv, is_got_json) {
+        (false, true) => {
+            Ok(Some(a.unwrap()))
+        },
+        (true, false) => {
+            Ok(Some(b.unwrap()))  
+        },
+        (true, true) => {
+            let mut result: DownloadData = DownloadData {original: vec!(), with_count: HashMap::new()};
+            let left = a.unwrap();
+            for i in left.with_count {
+                result.with_count.insert(i.0, i.1);
+            }
+
+            let right = b.unwrap();
+            for i in right.with_count {
+                *result.with_count.entry(i.0.to_string()).or_insert(0) += i.1;
+            }
+
+            result.original = left.original.into_iter().chain(right.original).collect();
+
+            
+            Ok(Some(result))
+        },
+        _ => {
+            Ok(None)
+        },
+    }
+
+
 }
 
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // let _url = "https://www.nicovideo.jp/watch/sm38531871";
-    // let _url = "https://www.nicovideo.jp/watch/sm25597642";
-    let _url = "https://www.nicovideo.jp/watch/sm31881208";
+    let _url = "https://www.nicovideo.jp/watch/sm25597642";
+    // let _url = "https://www.nicovideo.jp/watch/sm31881208";
     
 
     let video_id: String;
@@ -164,10 +245,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+
+    
     match check_before_2017_12_12_or_after(&video_id).await? {
         _IsRenewal::_Before => {
             println!("before");
-            create_list_from_json(&video_id).await?;
+            let c = before_process(&video_id).await?;
+            if c.is_some() {
+                let result = c.unwrap();
+                for i in result.with_count {
+                    println!("{} x {}", i.0, i.1);
+                    
+                }
+            }
         },
         _IsRenewal::_After => {
             create_list_from_json(&video_id).await?;
