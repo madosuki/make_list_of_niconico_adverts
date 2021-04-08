@@ -238,7 +238,7 @@ async fn before_process(video_id: &str) -> Result<Option<DownloadData>, Box<dyn 
     }
 }
 
-fn shape_text(data: DownloadData, mode: Mode, width: i32) -> String {
+fn shape_text(data: DownloadData, mode: Mode, width: u32) -> String {
     
     match mode {
         Mode::WithCount => {
@@ -260,7 +260,7 @@ fn shape_text(data: DownloadData, mode: Mode, width: i32) -> String {
                 }
             }
 
-            s
+            s + "\n"
         },
         Mode::Normal => {
 
@@ -281,7 +281,7 @@ fn shape_text(data: DownloadData, mode: Mode, width: i32) -> String {
                 }
             }
             
-            s
+            s + "\n"
         }
     }
 }
@@ -295,7 +295,7 @@ fn write_to_file(video_id: &str, s: &str) -> std::io::Result<()> {
 }
 
 
-async fn get_list(url: &str, width: i32, mode: Mode) -> Result<(), Box<dyn std::error::Error>> {
+async fn get_list(url: &str, width: u32, mode: Mode) -> Result<(), Box<dyn std::error::Error>> {
 
     let video_id: String;
     let re = Regex::new(r"https://www.nicovideo.jp/watch/(sm[0-9]+)$").unwrap();
@@ -372,7 +372,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("require url".into())
     }
 
-    let width: i32;
+    let width: u32;
     if tmp_width.len() > 0 {
         width = tmp_width.parse().unwrap_or(3);
     } else {
@@ -381,7 +381,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mode: Mode;
     if tmp_mode.len() > 0 {
-        let tmp: i32 = tmp_mode.parse().unwrap_or(0);
+        let tmp: u32 = tmp_mode.parse().unwrap_or(0);
         match tmp {
             1 => { mode = Mode::WithCount },
             _ => { mode = Mode::Normal }
