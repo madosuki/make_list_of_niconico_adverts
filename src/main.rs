@@ -1,4 +1,6 @@
 use std::collections::HashMap;
+use std::fs::File;
+use std::io::prelude::*;
 
 use serde::Deserialize;
 use regex::Regex;
@@ -134,9 +136,16 @@ async fn create_list_from_csv(video_id: &str) -> Result<DownloadData, Box<dyn st
     let mut result: DownloadData = DownloadData {original: vec!(), with_count: HashMap::new()};
     
     let query = format!("https://secure-dcdn.cdn.nimg.jp/nicoad/res/old-video-comments/{}.csv", video_id);
-    let response = reqwest::get(query).await?.text().await?;
-    let splited_from_newline = response.split("\n");
+    let response = reqwest::get(query).await?;
+    let status = response.status();
+    if status != 200 {
+        return Err("status code is not 200 in create_list_from_csv".into())
+    }
 
+    
+    let text = response.text().await?;
+    let splited_from_newline = text.split("\n");
+    
     let set_data = |x: &str| {
         let splited_from_camma: Vec<&str> = x.split(",").collect();
         let key: String = splited_from_camma[0].to_owned();
@@ -292,6 +301,15 @@ fn shape_text(data: DownloadData, mode: Mode, width: i32) -> String {
     }
 }
 
+
+fn write_to_file(video_id: &str, s: &str) -> std::io::Result<()> {
+    
+    let mut file = File::create(format!("{}_list.txt", video_id))?;
+
+    file.write_all(s.as_bytes())
+}
+
+
 async fn get_list(url: &str, width: i32) -> Result<(), Box<dyn std::error::Error>> {
 
     let video_id: String;
@@ -302,11 +320,9 @@ async fn get_list(url: &str, width: i32) -> Result<(), Box<dyn std::error::Error
             video_id = x[1].to_string();
         }
         _ => {
-            println!("invalid url");
-            panic!("")
+            return Err("invalid url in get_list".into())
         }
     }
-
 
     
     match check_before_2017_12_12_or_after(&video_id).await? {
@@ -316,18 +332,31 @@ async fn get_list(url: &str, width: i32) -> Result<(), Box<dyn std::error::Error
             if c.is_some() {
                 let result = c.unwrap();
                 let final_text = shape_text(result, Mode::WithCount, width);
-                println!("{}", final_text);
+                let r = write_to_file(&video_id, &final_text);
+                if r.is_err() {
+                    Err("write error in before process in match".into())
+                } else {
+                    Ok(())
+                }
+            } else {
+                Err("detect error in before_process".into())
             }
         },
         _IsRenewal::_After => {
             let a = create_list_from_json(&video_id).await?;
             let final_text = shape_text(a, Mode::Normal, width);
-            println!("{}", final_text);
+            let r = write_to_file(&video_id, &final_text);
+            if r.is_err() {
+                Err("write error in after process".into())
+            } else {
+                Ok(())
+            }
+
         }
     }
 
-    Ok(())
 }
+
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -354,7 +383,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let tmp_width = matches.value_of("width").unwrap_or("");
 
     if _url.len() == 0 {
-        panic!("requre url")
+        return Err("require url".into())
     }
 
     let width: i32;
