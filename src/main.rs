@@ -7,21 +7,6 @@ use regex::Regex;
 use chrono::DateTime;
 use clap::{Arg, App};
 
-// struct OptionError {
-//     e: String
-// }
-
-// impl fmt::Display for OptionError {
-//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-//         write!(f, "Error: {}", self.0)
-//     }
-// }
-
-// impl std::error::Error for OptionError {
-//     fn description(&self) -> &str { &self.e }
-// }
-
-
 enum Mode {
     Normal,
     WithCount
