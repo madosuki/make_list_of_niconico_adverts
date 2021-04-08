@@ -247,9 +247,17 @@ fn shape_text(data: DownloadData, mode: Mode, width: u32) -> String {
             
             for i in data.with_count {
                 if count > 0 {
-                    s = format!("{} {}x{}", s, i.0, i.1);
+                    if i.1 > 1 {
+                        s = format!("{} {}x{}", s, i.0, i.1);
+                    } else {
+                        s = format!("{} {}", s, i.0);
+                    }
                 } else {
-                    s = format!("{}{}x{}", s, i.0, i.1);
+                    if i.1 > 1 {
+                        s = format!("{}{}x{}", s, i.0, i.1);
+                    } else {
+                        s = format!("{}{}", s, i.0);
+                    }
                 }
 
                 count += 1;
