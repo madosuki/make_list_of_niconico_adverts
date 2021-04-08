@@ -310,7 +310,7 @@ fn write_to_file(video_id: &str, s: &str) -> std::io::Result<()> {
 }
 
 
-async fn get_list(url: &str, width: i32) -> Result<(), Box<dyn std::error::Error>> {
+async fn get_list(url: &str, width: i32, mode: Mode) -> Result<(), Box<dyn std::error::Error>> {
 
     let video_id: String;
     let re = Regex::new(r"https://www.nicovideo.jp/watch/(sm[0-9]+)$").unwrap();
@@ -331,7 +331,7 @@ async fn get_list(url: &str, width: i32) -> Result<(), Box<dyn std::error::Error
             let c = before_process(&video_id).await?;
             if c.is_some() {
                 let result = c.unwrap();
-                let final_text = shape_text(result, Mode::WithCount, width);
+                let final_text = shape_text(result, mode, width);
                 let r = write_to_file(&video_id, &final_text);
                 if r.is_err() {
                     Err("write error in before process in match".into())
@@ -344,7 +344,7 @@ async fn get_list(url: &str, width: i32) -> Result<(), Box<dyn std::error::Error
         },
         _IsRenewal::_After => {
             let a = create_list_from_json(&video_id).await?;
-            let final_text = shape_text(a, Mode::Normal, width);
+            let final_text = shape_text(a, mode, width);
             let r = write_to_file(&video_id, &final_text);
             if r.is_err() {
                 Err("write error in after process".into())
@@ -370,17 +370,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
              .short("u")
              .long("url")
              .takes_value(true)
-             .help("video url.")
+             .help("video url. must set.")
         )
         .arg(Arg::with_name("width")
              .short("w")
              .long("width")
              .takes_value(true)
              .help("number of name in per line. this param is optional. default value of 3."))
+        .arg(Arg::with_name("mode")
+             .short("m")
+             .long("mode")
+             .takes_value(true)
+             .help("specific mode. could set 0 or 1. 0 is without count and not ommit duplicate name. 1 is with count and ommit duplicate name. default value is 0. is optional."))
         .get_matches();
 
     let _url = matches.value_of("url").unwrap_or("");
     let tmp_width = matches.value_of("width").unwrap_or("");
+    let tmp_mode = matches.value_of("mode").unwrap_or("");
 
     if _url.len() == 0 {
         return Err("require url".into())
@@ -393,7 +399,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         width = 3;
     }
 
-    get_list(_url, width).await?;
+    let mode: Mode;
+    if tmp_mode.len() > 0 {
+        let tmp: i32 = tmp_mode.parse().unwrap_or(0);
+        match tmp {
+            1 => { mode = Mode::WithCount },
+            _ => { mode = Mode::Normal }
+
+        }
+    } else {
+        mode = Mode::Normal;
+    }
+
+
+    get_list(_url, width, mode).await?;
     
     Ok(())
 }
