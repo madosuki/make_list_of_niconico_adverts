@@ -312,7 +312,6 @@ async fn get_list(url: &str, width: i32, mode: Mode) -> Result<(), Box<dyn std::
     
     match check_before_2017_12_12_or_after(&video_id).await? {
         _IsRenewal::_Before => {
-            println!("before");
             let c = before_process(&video_id).await?;
             if c.is_some() {
                 let result = c.unwrap();
@@ -345,10 +344,6 @@ async fn get_list(url: &str, width: i32, mode: Mode) -> Result<(), Box<dyn std::
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // let _url = "https://www.nicovideo.jp/watch/sm38531871";
-    // let _url = "https://www.nicovideo.jp/watch/sm25597642";
-    // let _url = "https://www.nicovideo.jp/watch/sm31881208";
-
     
     let matches = App::new("make list of niconico_adverts")
         .arg(Arg::with_name("url")
@@ -398,6 +393,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 
     get_list(_url, width, mode).await?;
-    
+
+    println!("success");
+        
     Ok(())
 }
