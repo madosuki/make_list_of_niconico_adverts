@@ -238,7 +238,7 @@ async fn before_process(video_id: &str) -> Result<Option<DownloadData>, Box<dyn 
     }
 }
 
-fn shape_text(data: DownloadData, mode: Mode, width: u32) -> String {
+fn shape_text(data: DownloadData, front: &str, back: &str, mode: Mode, width: u32) -> String {
     
     match mode {
         Mode::WithCount => {
@@ -248,15 +248,15 @@ fn shape_text(data: DownloadData, mode: Mode, width: u32) -> String {
             for i in data.with_count {
                 if count > 0 {
                     if i.1 > 1 {
-                        s = format!("{} {}x{}", s, i.0, i.1);
+                        s = format!("{} {}{}x{}{}", s, front, i.0, i.1, back);
                     } else {
-                        s = format!("{} {}", s, i.0);
+                        s = format!("{} {}{}{}", s, front, i.0, back);
                     }
                 } else {
                     if i.1 > 1 {
-                        s = format!("{}{}x{}", s, i.0, i.1);
+                        s = format!("{}{}{}x{}{}", s, front, i.0, i.1, back);
                     } else {
-                        s = format!("{}{}", s, i.0);
+                        s = format!("{}{}{}{}", s, front, i.0, back);
                     }
                 }
 
@@ -276,9 +276,9 @@ fn shape_text(data: DownloadData, mode: Mode, width: u32) -> String {
             let mut count = 0;
             for i in data.original {
                 if count > 0 {
-                    s = format!("{} {}", s, i);
+                    s = format!("{} {}{}{}", s, front, i, back);
                 } else {
-                    s = format!("{}{}", s, i);
+                    s = format!("{}{}{}{}", s, front, i, back);
                 }
 
                 count += 1;
@@ -303,7 +303,7 @@ fn write_to_file(video_id: &str, s: &str) -> std::io::Result<()> {
 }
 
 
-async fn get_list(url: &str, width: u32, mode: Mode) -> Result<(), Box<dyn std::error::Error>> {
+async fn get_list(url: &str, front: &str, back: &str, width: u32, mode: Mode) -> Result<(), Box<dyn std::error::Error>> {
 
     let video_id: String;
     let re = Regex::new(r"https://www.nicovideo.jp/watch/(sm[0-9]+)$").unwrap();
@@ -323,7 +323,7 @@ async fn get_list(url: &str, width: u32, mode: Mode) -> Result<(), Box<dyn std::
             let c = before_process(&video_id).await?;
             if c.is_some() {
                 let result = c.unwrap();
-                let final_text = shape_text(result, mode, width);
+                let final_text = shape_text(result, front, back, mode, width);
                 let r = write_to_file(&video_id, &final_text);
                 if r.is_err() {
                     Err("write error in before process in match".into())
@@ -336,7 +336,7 @@ async fn get_list(url: &str, width: u32, mode: Mode) -> Result<(), Box<dyn std::
         },
         _IsRenewal::_After => {
             let a = create_list_from_json(&video_id).await?;
-            let final_text = shape_text(a, mode, width);
+            let final_text = shape_text(a, front, back, mode, width);
             let r = write_to_file(&video_id, &final_text);
             if r.is_err() {
                 Err("write error in after process".into())
@@ -370,12 +370,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
              .long("mode")
              .takes_value(true)
              .help("specific mode. could set 0 or 1. 0 is without count and not ommit duplicate name. 1 is with count and ommit duplicate name. default value is 0. is optional."))
+        .arg(Arg::with_name("front")
+             .short("f")
+             .long("front")
+             .takes_value(true)
+             .help("prefix of advert user name"))
+        .arg(Arg::with_name("back")
+             .short("b")
+             .long("back")
+             .takes_value(true)
+             .help("end string in advert user name"))
         .get_matches();
 
     let _url = matches.value_of("url").unwrap_or("");
     let tmp_width = matches.value_of("width").unwrap_or("");
     let tmp_mode = matches.value_of("mode").unwrap_or("");
-
+    let front = matches.value_of("front").unwrap_or("");
+    let back = matches.value_of("back").unwrap_or("");
+    
     if _url.len() == 0 {
         return Err("require url".into())
     }
@@ -400,7 +412,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
 
-    get_list(_url, width, mode).await?;
+    get_list(_url, front, back, width, mode).await?;
 
     println!("success");
         
