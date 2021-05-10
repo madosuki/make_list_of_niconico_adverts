@@ -248,13 +248,13 @@ fn shape_text(data: DownloadData, front: &str, back: &str, mode: Mode, width: u3
             for i in data.with_count {
                 if count > 0 {
                     if i.1 > 1 {
-                        s = format!("{} {}{}x{}{}", s, front, i.0, i.1, back);
+                        s = format!("{} {}{}{}x{}", s, front, i.0, back, i.1);
                     } else {
                         s = format!("{} {}{}{}", s, front, i.0, back);
                     }
                 } else {
                     if i.1 > 1 {
-                        s = format!("{}{}{}x{}{}", s, front, i.0, i.1, back);
+                        s = format!("{}{}{}{}x{}", s, front, i.0, back, i.1);
                     } else {
                         s = format!("{}{}{}{}", s, front, i.0, back);
                     }
