@@ -5,7 +5,7 @@ use std::io::prelude::*;
 use serde::Deserialize;
 use regex::Regex;
 use chrono::DateTime;
-use clap::{Arg, App};
+use clap::{Arg, Command};
 
 enum Mode {
     Normal,
@@ -353,30 +353,30 @@ async fn get_list(url: &str, front: &str, back: &str, width: u32, mode: Mode) ->
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
-    let matches = App::new("make list of niconico_adverts")
-        .arg(Arg::with_name("url")
-             .short("u")
+    let matches = Command::new("make list of niconico_adverts")
+        .arg(Arg::new("url")
+             .short('u')
              .long("url")
              .takes_value(true)
              .help("video url. must set.")
         )
-        .arg(Arg::with_name("width")
-             .short("w")
+        .arg(Arg::new("width")
+             .short('w')
              .long("width")
              .takes_value(true)
              .help("number of name in per line. this param is optional. default value of 3."))
-        .arg(Arg::with_name("mode")
-             .short("m")
+        .arg(Arg::new("mode")
+             .short('m')
              .long("mode")
              .takes_value(true)
              .help("specific mode. could set 0 or 1. 0 is without count and not ommit duplicate name. 1 is with count and ommit duplicate name. default value is 0. is optional."))
-        .arg(Arg::with_name("front")
-             .short("f")
+        .arg(Arg::new("front")
+             .short('f')
              .long("front")
              .takes_value(true)
              .help("prefix of advert user name"))
-        .arg(Arg::with_name("back")
-             .short("b")
+        .arg(Arg::new("back")
+             .short('b')
              .long("back")
              .takes_value(true)
              .help("end string in advert user name"))
