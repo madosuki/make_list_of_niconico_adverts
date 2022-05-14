@@ -5,7 +5,7 @@ use std::io::prelude::*;
 use serde::Deserialize;
 use regex::Regex;
 use chrono::DateTime;
-use clap::{Arg, Command};
+use clap::{Parser};
 
 enum Mode {
     Normal,
@@ -349,70 +349,47 @@ async fn get_list(url: &str, front: &str, back: &str, width: u32, mode: Mode) ->
 
 }
 
+#[derive(Parser, Debug)]
+#[clap(author = "madosuki", version = "v0.0.3", about = "make list of niconico adverts", long_about = None)]
+struct Args {
+    #[clap(short = 'u', long = "url", help = "video url. must set.")]
+    url: String,
+    
+    #[clap(short = 'w', long = "width", help = "number of name in per line. this param is optional. default value of 3.")]
+    width: Option<u32>,
+    
+    #[clap(short = 'm', long = "mode", help = "number of name in per line. this param is optional. default value of 3.")]
+    mode: Option<bool>,
+
+    #[clap(short = 'f', long = "front", help = "prefix of advert user name")]
+    front: Option<String>,
+    
+    #[clap(short = 'b', long = "back", help = "suffix of advert user name")]
+    back: Option<String>
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
-    let matches = Command::new("make list of niconico_adverts")
-        .arg(Arg::new("url")
-             .short('u')
-             .long("url")
-             .takes_value(true)
-             .help("video url. must set.")
-        )
-        .arg(Arg::new("width")
-             .short('w')
-             .long("width")
-             .takes_value(true)
-             .help("number of name in per line. this param is optional. default value of 3."))
-        .arg(Arg::new("mode")
-             .short('m')
-             .long("mode")
-             .takes_value(true)
-             .help("specific mode. could set 0 or 1. 0 is without count and not ommit duplicate name. 1 is with count and ommit duplicate name. default value is 0. is optional."))
-        .arg(Arg::new("front")
-             .short('f')
-             .long("front")
-             .takes_value(true)
-             .help("prefix of advert user name"))
-        .arg(Arg::new("back")
-             .short('b')
-             .long("back")
-             .takes_value(true)
-             .help("end string in advert user name"))
-        .get_matches();
-
-    let _url = matches.value_of("url").unwrap_or("");
-    let tmp_width = matches.value_of("width").unwrap_or("");
-    let tmp_mode = matches.value_of("mode").unwrap_or("");
-    let front = matches.value_of("front").unwrap_or("");
-    let back = matches.value_of("back").unwrap_or("");
-    
-    if _url.len() == 0 {
-        return Err("require url".into())
-    }
-
-    let width: u32;
-    if tmp_width.len() > 0 {
-        width = tmp_width.parse().unwrap_or(3);
-    } else {
-        width = 3;
-    }
-
+    let args: Args = Args::parse();
+    let width: u32 = args.width.unwrap_or(3);
+    let is_mode: bool = args.mode.unwrap_or(false);
     let mode: Mode;
-    if tmp_mode.len() > 0 {
-        let tmp: u32 = tmp_mode.parse().unwrap_or(0);
-        match tmp {
-            1 => { mode = Mode::WithCount },
-            _ => { mode = Mode::Normal }
-
-        }
+    if is_mode {
+        mode = Mode::WithCount;
     } else {
         mode = Mode::Normal;
     }
 
+    let _url: String = args.url;
+    if _url.len() == 0 {
+        return Err("require url".into())    
+    }                                       
 
-    get_list(_url, front, back, width, mode).await?;
+    let front: String = args.front.unwrap_or("".to_string());
+    let back: String = args.back.unwrap_or("".to_string());
+
+    get_list(&_url, &front, &back, width, mode).await?;
 
     println!("success");
         

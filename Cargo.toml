@@ -13,4 +13,4 @@ serde = { version = "1", features = ["derive"] }
 regex = "1"
 serde-xml-rs = "0.5"
 chrono = "0.4"
-clap = "3"
+clap = { version = "3", features = ["derive"] }
