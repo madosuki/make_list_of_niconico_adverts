@@ -7,11 +7,6 @@ use regex::Regex;
 use chrono::DateTime;
 use clap::{Parser};
 
-enum Mode {
-    Normal,
-    WithCount
-}
-
 #[derive(Deserialize, Debug)]
 struct Thumb {
     video_id: String,
@@ -238,25 +233,24 @@ async fn before_process(video_id: &str) -> Result<Option<DownloadData>, Box<dyn 
     }
 }
 
-fn shape_text(data: DownloadData, front: &str, back: &str, mode: Mode, width: u32) -> String {
+fn shape_text(data: DownloadData, prefix: &str, suffix: &str, is_enable_count: bool, width: u32) -> String {
     
-    match mode {
-        Mode::WithCount => {
+    if is_enable_count {
             let mut s: String = "".to_owned();
             let mut count = 0;
             
             for i in data.with_count {
                 if count > 0 {
                     if i.1 > 1 {
-                        s = format!("{} {}{}{}x{}", s, front, i.0, back, i.1);
+                        s = format!("{} {}{}{} x{}", s, prefix, i.0, suffix, i.1);
                     } else {
-                        s = format!("{} {}{}{}", s, front, i.0, back);
+                        s = format!("{} {}{}{}", s, prefix, i.0, suffix);
                     }
                 } else {
                     if i.1 > 1 {
-                        s = format!("{}{}{}{}x{}", s, front, i.0, back, i.1);
+                        s = format!("{}{}{}{} x{}", s, prefix, i.0, suffix, i.1);
                     } else {
-                        s = format!("{}{}{}{}", s, front, i.0, back);
+                        s = format!("{}{}{}{}", s, prefix, i.0, suffix);
                     }
                 }
 
@@ -266,19 +260,19 @@ fn shape_text(data: DownloadData, front: &str, back: &str, mode: Mode, width: u3
                     s = s + "\n";
                     count = 0;
                 }
+                
             }
 
             s + "\n"
-        },
-        Mode::Normal => {
+    } else {
 
             let mut s: String = "".to_owned();
             let mut count = 0;
             for i in data.original {
                 if count > 0 {
-                    s = format!("{} {}{}{}", s, front, i, back);
+                    s = format!("{} {}{}{}", s, prefix, i, suffix);
                 } else {
-                    s = format!("{}{}{}{}", s, front, i, back);
+                    s = format!("{}{}{}{}", s, prefix, i, suffix);
                 }
 
                 count += 1;
@@ -290,7 +284,6 @@ fn shape_text(data: DownloadData, front: &str, back: &str, mode: Mode, width: u3
             }
             
             s + "\n"
-        }
     }
 }
 
@@ -303,7 +296,7 @@ fn write_to_file(video_id: &str, s: &str) -> std::io::Result<()> {
 }
 
 
-async fn get_list(url: &str, front: &str, back: &str, width: u32, mode: Mode) -> Result<(), Box<dyn std::error::Error>> {
+async fn get_list(url: &str, prefix: &str, suffix: &str, width: u32, is_enable_count: bool) -> Result<(), Box<dyn std::error::Error>> {
 
     let video_id: String;
     let re = Regex::new(r"https://www.nicovideo.jp/watch/(sm[0-9]+)$").unwrap();
@@ -323,7 +316,7 @@ async fn get_list(url: &str, front: &str, back: &str, width: u32, mode: Mode) ->
             let c = before_process(&video_id).await?;
             if c.is_some() {
                 let result = c.unwrap();
-                let final_text = shape_text(result, front, back, mode, width);
+                let final_text = shape_text(result, prefix, suffix, is_enable_count, width);
                 let r = write_to_file(&video_id, &final_text);
                 if r.is_err() {
                     Err("write error in before process in match".into())
@@ -336,7 +329,7 @@ async fn get_list(url: &str, front: &str, back: &str, width: u32, mode: Mode) ->
         },
         _IsRenewal::_After => {
             let a = create_list_from_json(&video_id).await?;
-            let final_text = shape_text(a, front, back, mode, width);
+            let final_text = shape_text(a, prefix, suffix, is_enable_count, width);
             let r = write_to_file(&video_id, &final_text);
             if r.is_err() {
                 Err("write error in after process".into())
@@ -349,7 +342,7 @@ async fn get_list(url: &str, front: &str, back: &str, width: u32, mode: Mode) ->
 
 }
 
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Default)]
 #[clap(author = "madosuki", version = "v0.0.3", about = "make list of niconico adverts", long_about = None)]
 struct Args {
     #[clap(short = 'u', long = "url", help = "video url. must set.")]
@@ -358,14 +351,14 @@ struct Args {
     #[clap(short = 'w', long = "width", help = "number of name in per line. this param is optional. default value of 3.")]
     width: Option<u32>,
     
-    #[clap(short = 'm', long = "mode", help = "number of name in per line. this param is optional. default value of 3.")]
-    mode: Option<bool>,
+    #[clap(short = 'c', long = "enable-count", help = "whether count of times of advert from per a person. e.g. \"Alice x2\" this mean is Alice do advert 2 times.")]
+    enable_count: bool,
 
-    #[clap(short = 'f', long = "front", help = "prefix of advert user name")]
-    front: Option<String>,
+    #[clap(short = 'p', long = "prefix", help = "prefix of advert user name")]
+    prefix: Option<String>,
     
-    #[clap(short = 'b', long = "back", help = "suffix of advert user name")]
-    back: Option<String>
+    #[clap(short = 's', long = "suffix", help = "suffix of advert user name")]
+    suffix: Option<String>
 }
 
 #[tokio::main]
@@ -373,23 +366,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     let args: Args = Args::parse();
     let width: u32 = args.width.unwrap_or(3);
-    let is_mode: bool = args.mode.unwrap_or(false);
-    let mode: Mode;
-    if is_mode {
-        mode = Mode::WithCount;
-    } else {
-        mode = Mode::Normal;
-    }
+    let is_enable_count: bool = args.enable_count;
 
     let _url: String = args.url;
     if _url.len() == 0 {
         return Err("require url".into())    
     }                                       
 
-    let front: String = args.front.unwrap_or("".to_string());
-    let back: String = args.back.unwrap_or("".to_string());
+    let prefix: String = args.prefix.unwrap_or("".to_string());
+    let suffix: String = args.suffix.unwrap_or("".to_string());
 
-    get_list(&_url, &front, &back, width, mode).await?;
+    get_list(&_url, &prefix, &suffix, width, is_enable_count).await?;
 
     println!("success");
         

@@ -11,6 +11,6 @@ reqwest = { version = "0.11", features = ["json"] }
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }
 regex = "1"
-serde-xml-rs = "0.5"
+serde-xml-rs = "0.6"
 chrono = "0.4"
-clap = { version = "3", features = ["derive"] }
+clap = { version = "4", features = ["derive"] }
