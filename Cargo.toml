@@ -1,6 +1,6 @@
 [package]
 name = "make_list_of_niconico_adverts"
-version = "0.0.3"
+version = "0.0.4"
 authors = ["madosuki <yurikasamaaikatsu@gmail.com>"]
 edition = "2018"
 

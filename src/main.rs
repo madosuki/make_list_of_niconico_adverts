@@ -343,7 +343,7 @@ async fn get_list(url: &str, prefix: &str, suffix: &str, width: u32, is_enable_c
 }
 
 #[derive(Parser, Debug, Default)]
-#[clap(author = "madosuki", version = "v0.0.3", about = "make list of niconico adverts", long_about = None)]
+#[clap(name = "make_list_of_niconico_adverts", author, about, version)]
 struct Args {
     #[clap(short = 'u', long = "url", help = "video url. must set.")]
     url: String,
